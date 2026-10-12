@@ -197,6 +197,7 @@ function renderStatus(v) {
     }
   }
   if (mode === 'online' && !online.connected && v.phase !== 'connecting') turn = 'Connection lost. Reconnecting…';
+  if (mode === 'online' && !online.connected && v.phase === 'connecting' && online.retry > 0) turn = 'Cannot reach the server. Retrying…';
   $('#statusEvent').textContent = event;
   $('#statusTurn').textContent = turn;
   $('#status').classList.toggle('alert', v.phase === 'battle' && !!v.myTurn);
@@ -220,6 +221,7 @@ function renderActions(v) {
     btns.push(`<button data-act="${act}" class="${accent || confirming ? 'btn-accent' : ''}"${disabled ? ' disabled' : ''}>${confirming ? 'Sure? Click again' : label}</button>`);
   };
   const s = online?.state;
+  if (mode === 'online' && !online.connected && (v.phase !== 'connecting' || online.retry > 0)) add('reconnect', 'Reconnect', true);
   if (v.phase === 'place') {
     if (v.editable) {
       add('shuffle', 'Shuffle');
@@ -551,9 +553,19 @@ function connect() {
     online.ws = null;
     online.connected = false;
     online.firing = false;
-    setTimeout(connect, Math.min(8000, 500 * 2 ** online.retry++));
+    online.retryTimer = setTimeout(connect, Math.min(8000, 500 * 2 ** online.retry++));
     if (mode === 'online') render();
   };
+}
+
+function reconnectNow() {
+  if (!online || online.connected) return;
+  clearTimeout(online.retryTimer);
+  online.retry = 0;
+  const ws = online.ws;
+  online.ws = null;
+  if (ws) { ws.onclose = null; ws.close(); }
+  connect();
 }
 
 function onServer(m) {
@@ -628,6 +640,7 @@ function act(a) {
       else send({ t: 'fleet', ships: placing.map(({ r, c, vertical }) => ({ r, c, vertical })) });
       return;
     case 'unready': send({ t: 'unready' }); return;
+    case 'reconnect': reconnectNow(); break;
     case 'resign':
       clearTimeout(aiTimer);
       finish('opp');
