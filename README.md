@@ -8,7 +8,7 @@ A small Node server (no npm dependencies) serves `public/` and runs online match
 
 - **vs Computer**: Easy (mostly random), Normal (hunt/target with checkerboard search), Hard (probability density over every possible ship placement). Win/loss record and best win per difficulty.
 - **vs Player online**: create a room and share the 4-letter code or invite link, or use *Quick match* to pair with whoever is waiting. The server owns both boards, so nobody can peek at the other fleet. Reloading or a dropped connection rejoins the same seat.
-- Classic fleet (5, 4, 3, 3, 2) on a 10×10 grid. Ships may not touch, so squares next to hits and around sunk ships are marked as water automatically.
+- Classic fleet (5, 4, 3, 3, 2) on a 10×10 grid. Ships may touch by default; with the optional "Ships can't touch" rule, squares next to hits and around sunk ships are marked as water automatically.
 - Drag ships to place them, tap to rotate (or `R`), *Shuffle* for a random layout.
 - Optional "Hit = shoot again" rule. Keyboard targeting with arrow keys and `Enter`.
 - vs-computer games auto-save to `localStorage`; light/dark theme.

@@ -34,11 +34,15 @@ darkToggle.addEventListener('click', () => {
 });
 
 // ── State ──
-const settings = { level: 'normal', extraShot: false, name: '', ...store.get('bs-settings', {}) };
+const settings = { level: 'normal', extraShot: false, noTouch: false, name: '', ...store.get('bs-settings', {}) };
 const saveSettings = () => store.set('bs-settings', settings);
 
 let mode = null; // null = menu, 'ai' | 'online'
 let game = store.get('bs-game', null); // vs-computer game (persisted)
+if (game && game.noTouch === undefined) { // saved before the rule became optional
+  game.noTouch = true;
+  for (const b of [game.player, game.enemy]) if (b) b.noTouch = true;
+}
 let online = null; // { ws, code, token, intent, state, connected, retry, firing }
 let placing = null; // ships being arranged on the placement screen
 let drag = null; // { i, offset, x, y, moved, ghost }
@@ -283,6 +287,7 @@ function renderMenu() {
     b.setAttribute('aria-checked', on);
   });
   $('#extraShot').checked = settings.extraShot;
+  $('#noTouch').checked = settings.noTouch;
   if (document.activeElement !== $('#nameInput')) $('#nameInput').value = settings.name;
   $('#record').textContent = recordText(settings.level);
   const resume = [];
@@ -297,8 +302,11 @@ function renderMenu() {
 
 // ── Placement ──
 
+/** Whether ships in the current game must keep a gap between them. */
+const noTouch = () => (mode === 'ai' ? !!game?.noTouch : !!online?.state?.noTouch);
+
 function shuffle() {
-  placing = randomFleet();
+  placing = randomFleet(Math.random, SIZE, noTouch());
   savePlacing();
   render();
 }
@@ -320,7 +328,7 @@ function rotate(i, offset) {
     if (o < 0 || o >= s.len) continue;
     tries.push(vertical ? { ...s, vertical, r: pr - o, c: pc } : { ...s, vertical, r: pr, c: pc - o });
   }
-  const ok = tries.find(t => canPlace(placing, t, SIZE, i));
+  const ok = tries.find(t => canPlace(placing, t, SIZE, i, noTouch()));
   if (ok) {
     placing[i] = ok;
     savePlacing();
@@ -356,7 +364,7 @@ myView.grid.addEventListener('pointermove', e => {
   const key = g ? `${g.r},${g.c}` : '';
   if (drag.key === key && drag.ghost) return;
   drag.key = key;
-  drag.ghost = g && { ...g, ok: canPlace(placing, g, SIZE, drag.i) };
+  drag.ghost = g && { ...g, ok: canPlace(placing, g, SIZE, drag.i, noTouch()) };
   renderBoards();
 });
 
@@ -445,8 +453,9 @@ function startAi() {
   game = {
     level: settings.level,
     extraShot: settings.extraShot,
+    noTouch: settings.noTouch,
     phase: 'place',
-    ships: randomFleet(),
+    ships: randomFleet(Math.random, SIZE, settings.noTouch),
     player: null,
     enemy: null,
     turn: 'me',
@@ -471,8 +480,8 @@ function resumeAi() {
 }
 
 function beginBattle() {
-  game.player = newBoard(placing);
-  game.enemy = newBoard(randomFleet());
+  game.player = newBoard(placing, SIZE, game.noTouch);
+  game.enemy = newBoard(randomFleet(Math.random, SIZE, game.noTouch), SIZE, game.noTouch);
   game.phase = 'battle';
   game.turn = Math.random() < 0.5 ? 'me' : 'opp';
   if (game.turn === 'opp') scheduleAi();
@@ -582,7 +591,7 @@ function onServer(m) {
     online.state = m;
     online.firing = false;
     if (m.phase === 'place' && (!prev || prev.phase !== 'place' || (prev.me.ready && !m.me.ready) || !placing)) {
-      placing = m.me.board ? m.me.board.ships.map(s => ({ ...s })) : (prev?.phase === 'place' && placing) || randomFleet();
+      placing = m.me.board ? m.me.board.ships.map(s => ({ ...s })) : (prev?.phase === 'place' && placing) || randomFleet(Math.random, SIZE, m.noTouch);
     }
     if (m.phase === 'over' && prev?.phase !== 'over') {
       overDismissed = false;
@@ -695,9 +704,10 @@ $('#levelSeg').addEventListener('click', e => {
   renderMenu();
 });
 $('#extraShot').addEventListener('change', e => { settings.extraShot = e.target.checked; saveSettings(); });
+$('#noTouch').addEventListener('change', e => { settings.noTouch = e.target.checked; saveSettings(); });
 $('#nameInput').addEventListener('input', e => { settings.name = e.target.value.trim().slice(0, 16); saveSettings(); });
 $('#aiBtn').addEventListener('click', startAi);
-$('#createBtn').addEventListener('click', () => startOnline({ t: 'create', name: settings.name, extraShot: settings.extraShot }));
+$('#createBtn').addEventListener('click', () => startOnline({ t: 'create', name: settings.name, extraShot: settings.extraShot, noTouch: settings.noTouch }));
 $('#quickBtn').addEventListener('click', () => startOnline({ t: 'quick', name: settings.name }));
 $('#codeInput').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
 $('#joinForm').addEventListener('submit', e => {

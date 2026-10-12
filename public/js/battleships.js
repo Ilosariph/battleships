@@ -38,15 +38,19 @@ export function cellsOf({ r, c, len, vertical }) {
   return Array.from({ length: len }, (_, i) => (vertical ? [r + i, c] : [r, c + i]));
 }
 
-/** Ships must be in bounds and may not touch each other, not even diagonally. */
-export function canPlace(ships, ship, size = SIZE, ignore = -1) {
+/**
+ * Ships must be in bounds and may not overlap. With `noTouch` they may not
+ * touch each other either, not even diagonally.
+ */
+export function canPlace(ships, ship, size = SIZE, ignore = -1, noTouch = false) {
   const cells = cellsOf(ship);
   if (!cells.every(([r, c]) => inBounds(r, c, size))) return false;
+  const gap = noTouch ? 1 : 0;
   return ships.every((other, i) => i === ignore || cellsOf(other).every(([or, oc]) =>
-    cells.every(([r, c]) => Math.abs(r - or) > 1 || Math.abs(c - oc) > 1)));
+    cells.every(([r, c]) => Math.abs(r - or) > gap || Math.abs(c - oc) > gap)));
 }
 
-export function randomFleet(rng = Math.random, size = SIZE) {
+export function randomFleet(rng = Math.random, size = SIZE, noTouch = false) {
   for (;;) {
     const ships = [];
     for (const { name, len } of FLEET) {
@@ -57,14 +61,15 @@ export function randomFleet(rng = Math.random, size = SIZE) {
           r: Math.floor(rng() * (vertical ? size - len + 1 : size)),
           c: Math.floor(rng() * (vertical ? size : size - len + 1)),
         };
-        if (canPlace(ships, ship, size)) { ships.push(ship); break; }
+        if (canPlace(ships, ship, size, -1, noTouch)) { ships.push(ship); break; }
       }
     }
     if (ships.length === FLEET.length) return ships;
   }
 }
 
-export const newBoard = (ships, size = SIZE) => ({ size, ships: ships.map(s => ({ ...s })), shots: emptyGrid(size) });
+export const newBoard = (ships, size = SIZE, noTouch = false) =>
+  ({ size, noTouch, ships: ships.map(s => ({ ...s })), shots: emptyGrid(size) });
 
 export function shipAt(board, r, c) {
   return board.ships.findIndex(s => cellsOf(s).some(([sr, sc]) => sr === r && sc === c));
@@ -77,6 +82,7 @@ export const allSunk = board => board.ships.every(s => isSunk(board, s));
  * Fire at (r, c). Returns null if the cell can't be targeted, otherwise
  * `{ result: 'miss' | 'hit' | 'sunk', ship?, marks }` where `marks` are the cells
  * newly deduced as WATER: diagonals of a hit and the whole border of a sunk ship.
+ * Water is only deduced on `noTouch` boards; otherwise `marks` is always empty.
  */
 export function fire(board, r, c) {
   const { shots, size } = board;
@@ -89,7 +95,7 @@ export function fire(board, r, c) {
   shots[r][c] = HIT;
   const marks = [];
   const mark = (rr, cc) => {
-    if (inBounds(rr, cc, size) && shots[rr][cc] === UNKNOWN) {
+    if (board.noTouch && inBounds(rr, cc, size) && shots[rr][cc] === UNKNOWN) {
       shots[rr][cc] = WATER;
       marks.push([rr, cc]);
     }
@@ -172,7 +178,7 @@ function normalShot(v, rng) {
 }
 
 /** Probability density: count every placement of every remaining ship that fits what is known. */
-function hardShot(v, remaining, rng) {
+function hardShot(v, remaining, noTouch, rng) {
   const n = v.length;
   const score = emptyGrid(n);
   for (const len of remaining) {
@@ -187,7 +193,7 @@ function hardShot(v, remaining, rng) {
             const ar = rr + dr, ac = cc + dc;
             return inBounds(ar, ac, n) && v[ar][ac] === OPEN_HIT && !inside(ar, ac);
           }));
-          if (touches) continue;
+          if (noTouch && touches) continue;
           const k = cells.filter(([rr, cc]) => v[rr][cc] === OPEN_HIT).length;
           const w = k ? 50 ** k : 1;
           for (const [rr, cc] of cells) if (v[rr][cc] === OPEN) score[rr][cc] += w;
@@ -210,5 +216,5 @@ export function aiShot(board, level = 'normal', rng = Math.random) {
   if (level === 'easy') return easyShot(v, rng);
   if (level === 'normal') return normalShot(v, rng);
   const remaining = board.ships.filter(s => !isSunk(board, s)).map(s => s.len);
-  return hardShot(v, remaining, rng);
+  return hardShot(v, remaining, !!board.noTouch, rng);
 }

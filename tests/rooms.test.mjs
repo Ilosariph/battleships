@@ -27,6 +27,18 @@ test('validFleet rejects bad input', () => {
   assert.equal(validFleet(ok.map((s, i) => (i ? s : { ...s, r: 1.5 }))), null);
 });
 
+test('validFleet only rejects touching ships with noTouch', () => {
+  const touching = [
+    { r: 0, c: 0, vertical: false },
+    { r: 1, c: 0, vertical: false },
+    { r: 2, c: 0, vertical: false },
+    { r: 3, c: 0, vertical: false },
+    { r: 4, c: 0, vertical: false },
+  ];
+  assert.ok(validFleet(touching));
+  assert.equal(validFleet(touching, true), null);
+});
+
 test('newCode avoids taken codes', () => {
   const taken = new Map([['AAAA', 1]]);
   let n = 0;

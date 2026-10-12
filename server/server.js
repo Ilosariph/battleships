@@ -119,7 +119,7 @@ function handle(client, m) {
   const room = client.room;
   switch (m.t) {
     case "create": {
-      const r = createRoom({ extraShot: !!m.extraShot });
+      const r = createRoom({ extraShot: !!m.extraShot, noTouch: !!m.noTouch });
       if (!r) return send(client, { t: "error", msg: "Server is full, try again later." });
       seatClient(client, r, r.addPlayer(cleanName(m.name)));
       return;

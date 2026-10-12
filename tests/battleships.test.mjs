@@ -13,23 +13,39 @@ const fixed = [
   { name: 'Destroyer', len: 2, r: 0, c: 8, vertical: false },
 ];
 
-test('random fleets are complete, in bounds and never touch', () => {
-  for (let seed = 0; seed < 300; seed++) {
-    const ships = randomFleet(mulberry32(seed));
-    assert.deepEqual(ships.map(s => s.len), FLEET.map(f => f.len));
-    ships.forEach((s, i) => assert.ok(canPlace(ships, s, SIZE, i), `seed ${seed} ship ${i}`));
+test('random fleets are complete and in bounds, and never touch with noTouch', () => {
+  for (const noTouch of [false, true]) {
+    for (let seed = 0; seed < 300; seed++) {
+      const ships = randomFleet(mulberry32(seed), SIZE, noTouch);
+      assert.deepEqual(ships.map(s => s.len), FLEET.map(f => f.len));
+      ships.forEach((s, i) => assert.ok(canPlace(ships, s, SIZE, i, noTouch), `seed ${seed} ship ${i}`));
+    }
   }
 });
 
-test('canPlace rejects out of bounds and touching ships', () => {
+test('canPlace rejects out of bounds and overlapping ships', () => {
   assert.ok(canPlace(fixed, { len: 2, r: 7, c: 0, vertical: false }));
   assert.ok(!canPlace(fixed, { len: 2, r: 9, c: 9, vertical: false }));
-  assert.ok(!canPlace(fixed, { len: 2, r: 1, c: 5, vertical: false })); // diagonal to carrier
-  assert.ok(!canPlace(fixed, { len: 2, r: 6, c: 1, vertical: false })); // below battleship
+  assert.ok(!canPlace(fixed, { len: 2, r: 0, c: 4, vertical: true })); // overlaps carrier
+  assert.ok(canPlace(fixed, { len: 2, r: 1, c: 5, vertical: false })); // diagonal to carrier
+  assert.ok(canPlace(fixed, { len: 2, r: 6, c: 0, vertical: false })); // below battleship
+});
+
+test('canPlace with noTouch also rejects touching ships', () => {
+  assert.ok(canPlace(fixed, { len: 2, r: 7, c: 0, vertical: false }, SIZE, -1, true));
+  assert.ok(!canPlace(fixed, { len: 2, r: 1, c: 5, vertical: false }, SIZE, -1, true)); // diagonal to carrier
+  assert.ok(!canPlace(fixed, { len: 2, r: 6, c: 1, vertical: false }, SIZE, -1, true)); // below battleship
+});
+
+test('fire without noTouch deduces no water', () => {
+  const b = newBoard(fixed);
+  assert.deepEqual(fire(b, 0, 8).marks, []);
+  assert.deepEqual(fire(b, 0, 9).marks, []);
+  assert.equal(b.shots[1][9], UNKNOWN);
 });
 
 test('fire: miss, hit, sunk and deduced water', () => {
-  const b = newBoard(fixed);
+  const b = newBoard(fixed, SIZE, true);
   assert.equal(fire(b, 5, 9).result, 'miss');
   assert.equal(b.shots[5][9], MISS);
   assert.equal(fire(b, 5, 9), null, 'same cell twice');
@@ -49,15 +65,15 @@ test('fire: miss, hit, sunk and deduced water', () => {
 });
 
 test('allSunk after every ship cell is hit', () => {
-  const b = newBoard(fixed);
+  const b = newBoard(fixed, SIZE, true);
   for (const s of b.ships) for (const [r, c] of cellsOf(s)) fire(b, r, c);
   assert.ok(allSunk(b));
   for (const row of b.shots) for (const x of row) assert.ok([HIT, WATER, UNKNOWN].includes(x));
 });
 
-function playOut(level, seed) {
+function playOut(level, seed, noTouch = false) {
   const rng = mulberry32(seed);
-  const b = newBoard(randomFleet(rng));
+  const b = newBoard(randomFleet(rng, SIZE, noTouch), SIZE, noTouch);
   let shots = 0;
   while (!allSunk(b)) {
     const [r, c] = aiShot(b, level, rng);
@@ -68,7 +84,9 @@ function playOut(level, seed) {
 }
 
 test('every AI level only picks valid cells and finishes the game', () => {
-  for (const level of LEVELS) for (let seed = 0; seed < 25; seed++) playOut(level, seed);
+  for (const noTouch of [false, true]) {
+    for (const level of LEVELS) for (let seed = 0; seed < 25; seed++) playOut(level, seed, noTouch);
+  }
 });
 
 test('harder levels need fewer shots on average', () => {

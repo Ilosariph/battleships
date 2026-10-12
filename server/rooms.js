@@ -1,6 +1,6 @@
 // Online match state. The server owns both boards, so clients never see the opponent's ships.
 import crypto from "node:crypto";
-import { allSunk, canPlace, fire, FLEET, isSunk, newBoard } from "../public/js/battleships.js";
+import { allSunk, canPlace, fire, FLEET, isSunk, newBoard, SIZE } from "../public/js/battleships.js";
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -13,24 +13,25 @@ export function newCode(taken, rng = Math.random) {
 }
 
 /** Validate a client fleet (`[{ r, c, vertical }]` in FLEET order); returns clean ships or null. */
-export function validFleet(ships) {
+export function validFleet(ships, noTouch = false) {
   if (!Array.isArray(ships) || ships.length !== FLEET.length) return null;
   const out = [];
   for (let i = 0; i < FLEET.length; i++) {
     const s = ships[i];
     if (!s || !Number.isInteger(s.r) || !Number.isInteger(s.c)) return null;
     const ship = { ...FLEET[i], r: s.r, c: s.c, vertical: !!s.vertical };
-    if (!canPlace(out, ship)) return null;
+    if (!canPlace(out, ship, SIZE, -1, noTouch)) return null;
     out.push(ship);
   }
   return out;
 }
 
 export class Room {
-  constructor(code, { quick = false, extraShot = false, rng = Math.random } = {}) {
+  constructor(code, { quick = false, extraShot = false, noTouch = false, rng = Math.random } = {}) {
     this.code = code;
     this.quick = quick;
     this.extraShot = !!extraShot;
+    this.noTouch = !!noTouch;
     this.rng = rng;
     this.seats = []; // { token, name, conn, board, ready, rematch }
     this.phase = "place"; // place | battle | over
@@ -58,10 +59,10 @@ export class Room {
   /** Returns an error string or null. */
   setFleet(i, ships) {
     if (this.phase !== "place" || this.closed) return "Not placing ships right now.";
-    const fleet = validFleet(ships);
+    const fleet = validFleet(ships, this.noTouch);
     if (!fleet) return "Invalid fleet.";
     const seat = this.seats[i];
-    seat.board = newBoard(fleet);
+    seat.board = newBoard(fleet, SIZE, this.noTouch);
     seat.ready = true;
     if (this.full && this.seats.every((s) => s.ready)) {
       this.phase = "battle";
@@ -131,6 +132,7 @@ export class Room {
       code: this.code,
       phase: this.phase,
       extraShot: this.extraShot,
+      noTouch: this.noTouch,
       closed: this.closed,
       myTurn: this.phase === "battle" && this.turn === i,
       winner: over ? (this.winner === i ? "me" : "opp") : null,

@@ -35,6 +35,7 @@
         <button type="button" data-level="hard" role="radio">Hard</button>
       </div>
       <label class="check"><input type="checkbox" id="extraShot"> Hit = shoot again</label>
+      <label class="check"><input type="checkbox" id="noTouch"> Ships can't touch</label>
       <button class="btn-accent wide" id="aiBtn">Play</button>
       <p class="record" id="record"></p>
     </div>
@@ -50,14 +51,14 @@
         <input id="codeInput" maxlength="4" placeholder="Room code" aria-label="Room code" autocapitalize="characters" spellcheck="false">
         <button type="submit">Join</button>
       </form>
-      <p class="hint">Rooms use the "Hit = shoot again" setting above.</p>
+      <p class="hint">Rooms you create use the settings above.</p>
       <p class="err" id="onlineErr" hidden></p>
     </div>
 
     <details class="rules">
       <summary>How to play</summary>
-      <p>Each side hides a fleet of five ships on a 10×10 grid: Carrier (5), Battleship (4), Cruiser (3), Submarine (3), Destroyer (2). Ships are straight lines and may not touch each other, not even at the corners.</p>
-      <p>Take turns firing at the enemy grid. A dot is a miss, a red mark a hit. When every square of a ship is hit, it sinks. Because ships can't touch, squares diagonal to a hit and all squares around a sunk ship are marked as water automatically.</p>
+      <p>Each side hides a fleet of five ships on a 10×10 grid: Carrier (5), Battleship (4), Cruiser (3), Submarine (3), Destroyer (2). Ships are straight lines and may not overlap. With "Ships can't touch" they must also keep a gap of one square, even at the corners.</p>
+      <p>Take turns firing at the enemy grid. A dot is a miss, a red mark a hit. When every square of a ship is hit, it sinks. When ships can't touch, squares diagonal to a hit and all squares around a sunk ship are marked as water automatically.</p>
       <p>Sink all five enemy ships to win. Keyboard: arrow keys move over enemy waters, <kbd>Enter</kbd> fires. While placing, <kbd>R</kbd> rotates the ship under the pointer.</p>
     </details>
   </section>
