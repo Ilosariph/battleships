@@ -1,0 +1,12 @@
+{
+  "name": "battleships",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser Battleships vs the computer or online vs a friend",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server/server.js",
+    "test": "node --test tests/*.test.mjs"
+  }
+}
